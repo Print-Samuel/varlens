@@ -1,0 +1,10 @@
+##fileformat=VCFv4.2
+##source=varlens synthetic demo frequencies (fictional)
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	100150	.	G	A	.	.	AF=0.00001
+1	100420	.	C	T	.	.	AF=0.00003
+2	250300	.	A	G	.	.	AF=0.12
+3	500100	.	C	G	.	.	AF=0.0005
+3	500200	.	G	A,C	.	.	AF=0.00002,0.02
+4	750000	.	G	T	.	.	AF=0.0002
+5	900000	.	C	T	.	.	AF=0.03

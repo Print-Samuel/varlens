@@ -1,0 +1,13 @@
+##fileformat=VCFv4.2
+##source=varlens synthetic demo - fictional genes and coordinates, NOT real patient data
+##INFO=<ID=ANN,Number=.,Type=String,Description="SnpEff-style: Allele|Effect|Impact|Gene">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	DEMO_SAMPLE
+1	100150	.	G	A	99	PASS	ANN=A|stop_gained|HIGH|DEMO1	GT	0/1
+1	100420	.	C	T	99	PASS	ANN=T|missense_variant|MODERATE|DEMO1	GT	0/1
+2	250300	.	A	G	99	PASS	ANN=G|missense_variant|MODERATE|DEMO2	GT	0/1
+2	250999	.	T	TA	99	PASS	ANN=TA|frameshift_variant|HIGH|DEMO2	GT	1/1
+3	500100	.	C	G	99	PASS	ANN=G|missense_variant|MODERATE|DEMO3	GT	0/1
+3	500200	.	G	A,C	99	PASS	ANN=A|missense_variant|MODERATE|DEMO3,C|synonymous_variant|LOW|DEMO3	GT	1/2
+4	750000	.	G	T	99	PASS	ANN=T|missense_variant|MODERATE|DEMO4	GT	0/1
+chr5	900000	.	C	T	99	PASS	ANN=T|missense_variant|MODERATE|DEMO5	GT	0|1

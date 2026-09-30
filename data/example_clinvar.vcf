@@ -1,0 +1,9 @@
+##fileformat=VCFv4.2
+##source=varlens synthetic demo ClinVar-like records (fictional)
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	100150	1001	G	A	.	.	CLNSIG=Pathogenic;CLNREVSTAT=criteria_provided,_multiple_submitters,_no_conflicts;GENEINFO=DEMO1:1001;CLNDN=Demo_syndrome_1;MC=SO:0001587|nonsense
+1	100420	1002	C	T	.	.	CLNSIG=Uncertain_significance;CLNREVSTAT=criteria_provided,_single_submitter;GENEINFO=DEMO1:1001;CLNDN=Demo_syndrome_1;MC=SO:0001583|missense_variant
+2	250300	1003	A	G	.	.	CLNSIG=Benign;CLNREVSTAT=criteria_provided,_multiple_submitters,_no_conflicts;GENEINFO=DEMO2:1002;CLNDN=not_specified;MC=SO:0001583|missense_variant
+3	500100	1004	C	G	.	.	CLNSIG=Conflicting_classifications_of_pathogenicity;CLNREVSTAT=criteria_provided,_conflicting_classifications;GENEINFO=DEMO3:1003;CLNDN=Demo_disorder_3;MC=SO:0001583|missense_variant
+3	500200	1005	G	A	.	.	CLNSIG=Likely_pathogenic;CLNREVSTAT=criteria_provided,_single_submitter;GENEINFO=DEMO3:1003;CLNDN=Demo_disorder_3;MC=SO:0001583|missense_variant
+5	900000	1006	C	T	.	.	CLNSIG=Pathogenic;CLNREVSTAT=criteria_provided,_multiple_submitters,_no_conflicts;GENEINFO=DEMO5:1005;CLNDN=Demo_disorder_5;MC=SO:0001583|missense_variant

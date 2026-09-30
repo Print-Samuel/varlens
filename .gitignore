@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+*.html
+!docs/*.html
+# never commit real patient data or full ClinVar/gnomAD dumps
+*.vcf.gz
+!data/*.vcf.gz

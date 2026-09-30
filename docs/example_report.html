@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>varlens report</title><style>
+:root{--bg:#fff;--fg:#1c1f24;--muted:#5b6470;--line:#d8dde3;--card:#f6f8fa}
+@media (prefers-color-scheme:dark){:root{--bg:#14171b;--fg:#e6e9ed;--muted:#9aa4b1;--line:#2c333b;--card:#1b2026}}
+body{font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+h1{font-size:22px;margin:0 0 4px}.muted{color:var(--muted)}
+.warn{background:var(--card);border:1px solid var(--line);border-left:4px solid #c98a00;padding:10px 14px;border-radius:6px;margin:16px 0}
+.summary{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+.summary div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 16px;min-width:130px}
+.summary b{font-size:22px;display:block}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.high{background:#f8d7da;color:#842029}.review{background:#fff0c2;color:#664d03}
+.vus{background:#e2e3e5;color:#41464b}.low{background:#d1e7dd;color:#0f5132}
+ul{margin:0;padding-left:18px}code{font-family:ui-monospace,monospace;font-size:13px}
+</style></head>
+<body>
+<h1>varlens variant report</h1>
+<div class="muted">Input: example_patient.vcf &middot; ClinVar: example_clinvar.vcf &middot; Frequencies: example_freq.vcf &middot; varlens 0.1.0 &middot; 2026-09-28</div>
+<div class="warn"><b>Educational use only.</b> This is a rule-based prioritisation, not a clinical
+classification. Do not use it for diagnosis or medical decisions.</div>
+<div class="summary"><div><b>1</b>High priority</div><div><b>4</b>Needs manual review</div><div><b>2</b>Uncertain / unannotated</div><div><b>2</b>Low priority</div></div>
+<div class="scroll"><table>
+<thead><tr><th>Tier</th><th>Variant</th><th>Gene</th><th>Consequence</th><th>Zygosity</th>
+<th>Allele freq</th><th>ClinVar</th><th>Condition</th><th>Evidence</th></tr></thead>
+<tbody><tr><td><span class="tag high">High priority</span></td><td><code>1:100150 G&gt;A</code></td><td>DEMO1</td><td>stop_gained</td><td>heterozygous</td><td>1e-05</td><td>Pathogenic<br><span class='muted'>&#9733;&#9733;</span></td><td>Demo syndrome 1</td><td><ul><li>Frequency: 1e-05</li><li>ClinVar: Pathogenic (**)</li><li>Loss-of-function consequence (PVS1 candidate; check gene mechanism)</li><li>PM2_supporting: absent or AF &lt;= 0.0001</li></ul></td></tr><tr><td><span class="tag review">Needs manual review</span></td><td><code>2:250999 T&gt;TA</code></td><td>DEMO2</td><td>frameshift_variant</td><td>homozygous</td><td>-</td><td><span class="muted">not in ClinVar</span></td><td>-</td><td><ul><li>Frequency: not found in population data</li><li>Loss-of-function consequence (PVS1 candidate; check gene mechanism)</li><li>PM2_supporting: absent or AF &lt;= 0.0001</li></ul></td></tr><tr><td><span class="tag review">Needs manual review</span></td><td><code>3:500100 C&gt;G</code></td><td>DEMO3</td><td>missense_variant</td><td>heterozygous</td><td>0.0005</td><td>Conflicting classifications of pathogenicity<br><span class='muted'>&#9733;</span></td><td>Demo disorder 3</td><td><ul><li>Frequency: 0.0005</li><li>ClinVar: Conflicting classifications of pathogenicity (*)</li></ul></td></tr><tr><td><span class="tag review">Needs manual review</span></td><td><code>3:500200 G&gt;A</code></td><td>DEMO3</td><td>missense_variant</td><td>heterozygous</td><td>2e-05</td><td>Likely pathogenic<br><span class='muted'>&#9733;</span></td><td>Demo disorder 3</td><td><ul><li>Frequency: 2e-05</li><li>ClinVar: Likely pathogenic (*)</li><li>PM2_supporting: absent or AF &lt;= 0.0001</li></ul></td></tr><tr><td><span class="tag review">Needs manual review</span></td><td><code>5:900000 C&gt;T</code></td><td>DEMO5</td><td>missense_variant</td><td>heterozygous</td><td>0.03</td><td>Pathogenic<br><span class='muted'>&#9733;&#9733;</span></td><td>Demo disorder 5</td><td><ul><li>Frequency: 0.03</li><li>ClinVar: Pathogenic (**)</li><li>BS1: AF &gt;= 0.01 (too common for a rare disorder)</li><li>Conflict: ClinVar pathogenic but frequency is high; review</li></ul></td></tr><tr><td><span class="tag vus">Uncertain / unannotated</span></td><td><code>1:100420 C&gt;T</code></td><td>DEMO1</td><td>missense_variant</td><td>heterozygous</td><td>3e-05</td><td>Uncertain significance<br><span class='muted'>&#9733;</span></td><td>Demo syndrome 1</td><td><ul><li>Frequency: 3e-05</li><li>ClinVar: Uncertain significance (*)</li><li>PM2_supporting: absent or AF &lt;= 0.0001</li></ul></td></tr><tr><td><span class="tag vus">Uncertain / unannotated</span></td><td><code>4:750000 G&gt;T</code></td><td>DEMO4</td><td>missense_variant</td><td>heterozygous</td><td>0.0002</td><td><span class="muted">not in ClinVar</span></td><td>-</td><td><ul><li>Frequency: 0.0002</li></ul></td></tr><tr><td><span class="tag low">Low priority</span></td><td><code>2:250300 A&gt;G</code></td><td>DEMO2</td><td>missense_variant</td><td>heterozygous</td><td>0.12</td><td>Benign<br><span class='muted'>&#9733;&#9733;</span></td><td>not specified</td><td><ul><li>Frequency: 0.12</li><li>ClinVar: Benign (**)</li><li>BA1: AF &gt;= 0.05 (stand-alone benign)</li></ul></td></tr><tr><td><span class="tag low">Low priority</span></td><td><code>3:500200 G&gt;C</code></td><td>DEMO3</td><td>synonymous_variant</td><td>heterozygous</td><td>0.02</td><td><span class="muted">not in ClinVar</span></td><td>-</td><td><ul><li>Frequency: 0.02</li><li>BS1: AF &gt;= 0.01 (too common for a rare disorder)</li></ul></td></tr></tbody></table></div>
+</body></html>
