@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>varlens: genetic variant prioritisation with the evidence shown</title>
+<meta name="description" content="varlens is an open-source Python tool that annotates VCF files with ClinVar and gnomAD and ranks variants into four priority tiers using transparent rules. Educational project, not a clinical tool.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' fill='%23c0392b'/%3E%3Crect x='18' y='3' width='11' height='11' fill='%23d68910'/%3E%3Crect x='3' y='18' width='11' height='11' fill='%235d6d7e'/%3E%3Crect x='18' y='18' width='11' height='11' fill='%23229465'/%3E%3C/svg%3E">
+<style>
+:root {
+  --paper: #f5f8fa;
+  --panel: #ffffff;
+  --ink: #0f2233;
+  --muted: #4d6274;
+  --line: #d2dce4;
+  --accent: #0a5c8f;
+  --accent-ink: #ffffff;
+  --high-fg: #a82a20;   --high-bg: #fbe3e0;
+  --review-fg: #7d5200; --review-bg: #fcefd0;
+  --vus-fg: #46586a;    --vus-bg: #e4eaef;
+  --low-fg: #146044;    --low-bg: #d9f0e6;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0c1822;
+    --panel: #101f2b;
+    --ink: #e5edf3;
+    --muted: #9bb0c0;
+    --line: #243747;
+    --accent: #6db8e6;
+    --accent-ink: #08202f;
+    --high-fg: #ff9186;   --high-bg: #3a1b19;
+    --review-fg: #f2bd55; --review-bg: #382a0c;
+    --vus-fg: #b3c1cc;    --vus-bg: #1e2d3a;
+    --low-fg: #72d6ab;    --low-bg: #12352a;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 1rem/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.wrap { width: min(72rem, 100% - 2.5rem); margin-inline: auto; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.12; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin-bottom: 0.9rem; }
+h3 { font-size: 1.15rem; margin-bottom: 0.35rem; }
+p { margin: 0 0 1rem; max-width: 68ch; }
+code, pre { font-family: var(--mono); font-size: 0.9em; }
+:not(pre) > code { background: var(--vus-bg); color: var(--ink); padding: 0.1em 0.35em; border-radius: 3px; }
+
+/* header */
+.top { border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5rem; padding-block: 1rem; flex-wrap: wrap; }
+.mark { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; text-decoration: none; color: var(--ink); }
+.top nav { display: flex; gap: 1.4rem; flex-wrap: wrap; font-size: 0.95rem; }
+.top nav a { color: var(--muted); text-decoration: none; }
+.top nav a:hover { color: var(--ink); text-decoration: underline; }
+
+/* hero */
+.hero { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(2rem, 5vw, 4rem); align-items: start; }
+.hero h1 { font-size: clamp(2.3rem, 5.2vw, 3.7rem); margin-bottom: 1.2rem; }
+.lede { font-size: 1.15rem; color: var(--muted); margin-bottom: 1.6rem; }
+.actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1.6rem; }
+.btn { display: inline-block; padding: 0.65rem 1.1rem; border-radius: 4px; font-weight: 600; text-decoration: none; border: 1px solid var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.secondary { color: var(--accent); background: transparent; }
+.btn:hover { text-decoration: none; filter: brightness(1.08); }
+.fine { font-size: 0.92rem; color: var(--muted); max-width: 46ch; }
+
+/* triage widget */
+.triage { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1.3rem; }
+.triage h2 { font-size: 1.35rem; margin-bottom: 0.3rem; }
+.triage .help { font-size: 0.92rem; color: var(--muted); margin-bottom: 1rem; }
+.presets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.1rem; padding: 0; border: 0; }
+.presets legend { font-size: 0.85rem; color: var(--muted); padding: 0; margin-bottom: 0.4rem; }
+.presets button { font: inherit; font-size: 0.85rem; padding: 0.35rem 0.7rem; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 4px; cursor: pointer; }
+.presets button:hover { border-color: var(--accent); }
+.presets button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1rem; margin-bottom: 1.2rem; }
+.controls .full { grid-column: 1 / -1; }
+.controls label, .controls .lab { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
+.controls select, .controls input[type="range"] { width: 100%; font: inherit; }
+.controls select { padding: 0.4rem 0.5rem; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+.controls select:disabled, .controls input:disabled { opacity: 0.45; }
+.afrow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.afval { font-family: var(--mono); font-size: 0.9rem; min-width: 8ch; text-align: right; }
+.check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.88rem; margin-top: 0.4rem; color: var(--ink); }
+.lanes { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.4rem; }
+.lane { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.8rem; border: 1px solid var(--line); border-left-width: 6px; border-radius: 4px; color: var(--muted); transition: background-color 0.2s, color 0.2s; }
+.lane[data-tier="high"] { border-left-color: var(--high-fg); }
+.lane[data-tier="review"] { border-left-color: var(--review-fg); }
+.lane[data-tier="vus"] { border-left-color: var(--vus-fg); }
+.lane[data-tier="low"] { border-left-color: var(--low-fg); }
+.lane.active { font-weight: 600; }
+.lane.active[data-tier="high"] { background: var(--high-bg); color: var(--high-fg); }
+.lane.active[data-tier="review"] { background: var(--review-bg); color: var(--review-fg); }
+.lane.active[data-tier="vus"] { background: var(--vus-bg); color: var(--vus-fg); }
+.lane.active[data-tier="low"] { background: var(--low-bg); color: var(--low-fg); }
+.lane .tag { font-size: 0.8rem; font-weight: 400; }
+.why h3 { font-family: var(--sans); font-size: 0.9rem; font-weight: 600; letter-spacing: 0; margin-bottom: 0.3rem; }
+.why ul { margin: 0; padding-left: 1.1rem; font-size: 0.9rem; color: var(--muted); }
+
+/* sections */
+section.block { padding-block: clamp(2.2rem, 5vw, 3.5rem); border-top: 1px solid var(--line); }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem 2.2rem; margin-top: 1.8rem; }
+.cols p { font-size: 0.97rem; margin: 0; }
+
+.pipe { list-style: none; display: flex; align-items: stretch; gap: 0; padding: 0; margin: 1.6rem 0 0; }
+.pipe li { flex: 1; padding: 0.85rem 1rem; border: 1px solid var(--line); background: var(--panel); position: relative; }
+.pipe li + li { margin-left: 1.6rem; }
+.pipe li + li::before { content: ""; position: absolute; left: -1.6rem; top: 50%; width: 1.6rem; border-top: 2px solid var(--muted); }
+.pipe li + li::after { content: ""; position: absolute; left: -0.45rem; top: calc(50% - 5px); border: 5px solid transparent; border-left: 7px solid var(--muted); border-right: 0; }
+.pipe strong { display: block; font-family: var(--serif); font-size: 1.05rem; }
+.pipe span { font-size: 0.88rem; color: var(--muted); }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; padding: 0.6rem 0.8rem 0.6rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 0.88rem; }
+.scroll { overflow-x: auto; }
+.chip { display: inline-block; padding: 0.1rem 0.55rem; border-radius: 3px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.chip.high { background: var(--high-bg); color: var(--high-fg); }
+.chip.review { background: var(--review-bg); color: var(--review-fg); }
+.chip.vus { background: var(--vus-bg); color: var(--vus-fg); }
+.chip.low { background: var(--low-bg); color: var(--low-fg); }
+
+/* benchmark */
+.method { max-width: 68ch; }
+.pending { border: 1px dashed var(--line); padding: 1rem 1.2rem; border-radius: 6px; max-width: 68ch; }
+.pending pre { white-space: pre-wrap; word-break: break-word; }
+.bars { display: grid; gap: 0.9rem; margin: 1.4rem 0 0.6rem; }
+.barrow .lab { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.25rem; }
+.stack { display: flex; height: 1.5rem; border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
+.stack span { display: block; height: 100%; }
+.stack .high { background: var(--high-fg); } .stack .review { background: var(--review-fg); }
+.stack .vus { background: var(--vus-fg); }   .stack .low { background: var(--low-fg); }
+.legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.8rem; }
+.legend i { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.35rem; border-radius: 2px; vertical-align: -1px; }
+.metrics { display: grid; gap: 1.1rem 2.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 1.6rem; }
+.metric h3 { font-family: var(--sans); font-size: 0.95rem; font-weight: 600; letter-spacing: 0; }
+.metric .num { font-family: var(--serif); font-size: 2.2rem; line-height: 1.1; }
+.metric .sub { font-size: 0.85rem; color: var(--muted); }
+.ci { position: relative; height: 0.5rem; background: var(--vus-bg); border-radius: 3px; margin: 0.5rem 0 0.35rem; }
+.ci .range { position: absolute; top: 0; bottom: 0; background: var(--accent); opacity: 0.45; border-radius: 3px; }
+.ci .dot { position: absolute; top: -3px; width: 0.8rem; height: 0.8rem; margin-left: -0.4rem; background: var(--accent); border-radius: 50%; }
+
+/* code */
+.code { position: relative; margin: 0.4rem 0 1.4rem; }
+.code pre { margin: 0; padding: 1rem 1.1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; line-height: 1.55; }
+.code button { position: absolute; top: 0.5rem; right: 0.5rem; font: inherit; font-size: 0.8rem; padding: 0.2rem 0.6rem; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 4px; cursor: pointer; }
+.code button:hover { border-color: var(--accent); }
+
+ul.plain { padding-left: 1.2rem; max-width: 68ch; }
+ul.plain li { margin-bottom: 0.45rem; }
+footer { border-top: 1px solid var(--line); padding-block: 2rem 3rem; color: var(--muted); font-size: 0.92rem; }
+footer p { max-width: 70ch; }
+
+@media (max-width: 62rem) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .metrics { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 46rem) {
+  .pipe { flex-direction: column; }
+  .pipe li + li { margin-left: 0; margin-top: 1.6rem; }
+  .pipe li + li::before { left: 50%; top: -1.6rem; width: 0; height: 1.6rem; border-top: 0; border-left: 2px solid var(--muted); }
+  .pipe li + li::after { left: calc(50% - 5px); top: -0.45rem; border: 5px solid transparent; border-top: 7px solid var(--muted); border-bottom: 0; }
+  .controls { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .lane { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="#top">varlens</a>
+    <nav aria-label="Page sections">
+      <a href="#how">How it works</a>
+      <a href="#rules">The rules</a>
+      <a href="#benchmark">Benchmark</a>
+      <a href="#run">Run it</a>
+      <a href="https://github.com/Print-Samuel/varlens">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Every variant ranked, with the reasons shown.</h1>
+      <p class="lede">varlens reads a VCF file, annotates each variant with ClinVar and gnomAD, and sorts it into one of four priority tiers using plain rules you can audit. Every call comes with the evidence behind it.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/Print-Samuel/varlens">View on GitHub</a>
+        <a class="btn secondary" href="#benchmark">Read the benchmark</a>
+      </div>
+      <p class="fine">An educational project written in Python with no external dependencies. It is not a clinical tool and must not be used for diagnosis or medical decisions.</p>
+    </div>
+
+    <div class="triage" id="triage" aria-labelledby="triage-title">
+      <h2 id="triage-title">Triage one variant</h2>
+      <p class="help">Change the evidence and watch the tier move. This runs the same rules as the Python tool, in your browser.</p>
+      <noscript><p class="help">The live demo needs JavaScript. The rules are listed in the table further down.</p></noscript>
+
+      <fieldset class="presets" id="presets">
+        <legend>Start from an example</legend>
+      </fieldset>
+
+      <div class="controls">
+        <div class="full">
+          <div class="afrow">
+            <label for="af">Population allele frequency</label>
+            <output class="afval" id="afval" for="af">0.00001</output>
+          </div>
+          <input type="range" id="af" min="0" max="570" step="1" value="100">
+          <label class="check" for="notobs"><input type="checkbox" id="notobs"> Not observed in population data</label>
+        </div>
+        <div>
+          <label for="cv">ClinVar record</label>
+          <select id="cv">
+            <option value="none">Not in ClinVar</option>
+            <option value="pathogenic">Pathogenic</option>
+            <option value="benign">Benign</option>
+            <option value="vus">Uncertain significance</option>
+            <option value="conflicting">Conflicting classifications</option>
+          </select>
+        </div>
+        <div>
+          <label for="stars">ClinVar review stars</label>
+          <select id="stars">
+            <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option>
+          </select>
+        </div>
+        <div class="full">
+          <label for="csq">Molecular consequence</label>
+          <select id="csq">
+            <option value="missense">Missense (not loss of function)</option>
+            <option value="synonymous">Synonymous (not loss of function)</option>
+            <option value="stop">Stop gained (loss of function)</option>
+            <option value="frameshift">Frameshift (loss of function)</option>
+            <option value="splice">Canonical splice donor (loss of function)</option>
+          </select>
+        </div>
+      </div>
+
+      <div aria-live="polite">
+        <ol class="lanes" id="lanes"></ol>
+        <div class="why">
+          <h3>Evidence</h3>
+          <ul id="evidence"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p>One command takes a patient VCF and produces a sortable HTML report, plus a TSV if you want one.</p>
+    <ol class="pipe" aria-label="Pipeline">
+      <li><strong>VCF</strong><span>Streamed line by line</span></li>
+      <li><strong>Annotate</strong><span>ClinVar and gnomAD</span></li>
+      <li><strong>Apply the rules</strong><span>Four tiers, with evidence</span></li>
+      <li><strong>Report</strong><span>HTML and TSV</span></li>
+    </ol>
+    <div class="cols">
+      <div>
+        <h3>Reads large files</h3>
+        <p>The VCF is streamed, multi-allelic sites are split per allele, and <code>--region</code> scans one chromosome or a coordinate window of a whole-genome file without cutting it first.</p>
+      </div>
+      <div>
+        <h3>Annotates without a giant download</h3>
+        <p>ClinVar comes from its VCF. Frequencies come from a local gnomAD file or gnomAD's public API, with adaptive backoff when it rate-limits and an on-disk cache so reruns skip repeated lookups.</p>
+      </div>
+      <div>
+        <h3>Explains each call</h3>
+        <p>Each tier carries the evidence lines that produced it, so a reviewer can disagree with a call for a specific reason instead of trusting a score.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="rules">
+  <div class="wrap">
+    <h2>The rules</h2>
+    <p>The rules are inspired by the ACMG/AMP evidence types and are deliberately short. Defaults are configurable from the command line.</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Evidence</th><th>Rule (defaults)</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>BA1</td><td>Allele frequency of 5% or more</td><td><span class="chip low">Low priority</span> Overrides everything else</td></tr>
+        <tr><td>BS1</td><td>Allele frequency of 1% or more</td><td><span class="chip low">Low priority</span> or a flagged conflict with a ClinVar pathogenic call</td></tr>
+        <tr><td>PM2, supporting</td><td>Absent, or 0.01% or less</td><td>Supporting evidence line</td></tr>
+        <tr><td>Loss of function</td><td>Stop gain, frameshift, canonical splice, start loss</td><td>Rare and absent from ClinVar: <span class="chip review">Manual review</span></td></tr>
+        <tr><td>ClinVar pathogenic</td><td>2 or more review stars</td><td><span class="chip high">High priority</span></td></tr>
+        <tr><td>ClinVar pathogenic</td><td>Fewer stars, or conflicting</td><td><span class="chip review">Manual review</span></td></tr>
+        <tr><td>ClinVar benign</td><td>1 or more review stars</td><td><span class="chip low">Low priority</span></td></tr>
+        <tr><td>Anything else</td><td>No decisive evidence</td><td><span class="chip vus">Uncertain</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin-top:1rem">ClinVar is shown as its own evidence line rather than as the classic PP5 and BP6 criteria, because ClinGen's Sequence Variant Interpretation group recommended retiring those.</p>
+  </div>
+</section>
+
+<section class="block" id="benchmark">
+  <div class="wrap">
+    <h2>Does it work? A blind test against ClinVar</h2>
+    <div class="method">
+      <p>Ranking ClinVar variants using ClinVar's own verdict would be circular, because the answer key would also be an input. So the benchmark hides it. Each ClinVar variant goes through the rules with no ClinVar record, using only the population frequency and molecular consequence stored in ClinVar's VCF. The pathogenic or benign label is used afterwards, only to score the result.</p>
+      <p>That makes the question narrower and fairer: how much of the pathogenic versus benign signal do the frequency and consequence rules recover on their own?</p>
+    </div>
+
+    <div class="pending" id="bench-pending">
+      <p><strong>Results have not been generated yet.</strong> Run the benchmark on the full ClinVar VCF and it writes its numbers into this page:</p>
+      <div class="code" style="margin-bottom:0">
+        <pre>varlens-benchmark clinvar.vcf.gz --markdown BENCHMARK.md --embed docs/index.html</pre>
+      </div>
+    </div>
+
+    <div id="bench-results" hidden></div>
+  </div>
+</section>
+
+<section class="block" id="run">
+  <div class="wrap">
+    <h2>Run it</h2>
+    <p>Python 3.9 or newer. The demo uses synthetic data that ships with the repository.</p>
+    <div class="code"><pre>git clone https://github.com/Print-Samuel/varlens.git
+cd varlens
+pip install -e ".[dev]"
+varlens data/example_patient.vcf --clinvar data/example_clinvar.vcf --freq data/example_freq.vcf --out report.html</pre><button type="button" data-copy>Copy</button></div>
+    <p>Scan one region of a real genome, looking up frequencies through gnomAD's API:</p>
+    <div class="code"><pre>varlens sample.vcf.gz --region 21:20000000-26000000 --clinvar clinvar.vcf.gz --freq-api --out report.html</pre><button type="button" data-copy>Copy</button></div>
+    <p>See what the output looks like in the <a href="example_report.html">example report</a>.</p>
+  </div>
+</section>
+
+<section class="block" id="limits">
+  <div class="wrap">
+    <h2>What it does not do</h2>
+    <ul class="plain">
+      <li>It is not a clinical classifier. It prioritises variants for a human to look at, and it has not been validated for diagnosis.</li>
+      <li>Variants are matched exactly on chromosome, position, reference and alternate allele, so normalise indels first.</li>
+      <li>Through gnomAD's API, frequencies are one request per variant: fine for a region, too slow for a whole genome.</li>
+      <li>Loss of function is flagged, not asserted. There is no gene-disease mechanism data and no in-silico predictors.</li>
+      <li>The benchmark only tests what the rules can know without ClinVar's verdict. It says nothing about variants ClinVar has never seen.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built by Samuel Ubiedo Cerqueira, a Biology student at the University of Valencia specialising in genetics, genomics and computational biology.</p>
+    <p><a href="https://github.com/Print-Samuel/varlens">Source on GitHub</a> &nbsp; <a href="https://www.linkedin.com/in/samuel-ubiedo-cerqueira">LinkedIn</a> &nbsp; MIT licence</p>
+  </div>
+</footer>
+
+<script id="benchmark-data" type="application/json">{"varlens_version": "0.1.0", "date": "2026-10-14", "clinvar_file": "clinvar.vcf.gz", "region": null, "min_stars": 1, "mode": "blind", "thresholds": {"ba1": 0.05, "bs1": 0.01, "pm2": 0.0001}, "n": {"pathogenic": 335306, "benign": 1382522}, "prevalence_pathogenic": 0.19519183527105158, "tiers": {"pathogenic": {"high": 0, "review": 262834, "vus": 72452, "low": 20}, "benign": {"high": 0, "review": 2827, "vus": 1251963, "low": 127732}}, "af_coverage": {"pathogenic": {"k": 19024, "n": 335306, "rate": 0.05673623496149786, "ci": [0.05595826446990838, 0.05752436228040648]}, "benign": {"k": 533716, "n": 1382522, "rate": 0.3860452130237349, "ci": [0.38523399559957194, 0.3868570637361829]}}, "lof_fraction": {"pathogenic": {"k": 264486, "n": 335306, "rate": 0.7887899411284021, "ci": [0.7874050648771217, 0.7901682001242357]}, "benign": {"k": 3755, "n": 1382522, "rate": 0.0027160508114879908, "ci": [0.0026306659451876477, 0.002804199265942305]}}, "metrics": {"sensitivity_flag": {"k": 262834, "n": 335306, "rate": 0.7838630981849415, "ci": [0.782466629291984, 0.7852530627148133]}, "false_alarm_rate": {"k": 2827, "n": 1382522, "rate": 0.0020448137534158587, "ci": [0.0019708835110884317, 0.0021215113142062387]}, "pathogenic_dismissed": {"k": 20, "n": 335306, "rate": 5.964700900073366e-05, "ci": [3.8614075659333555e-05, 9.213544183410107e-05]}, "benign_recognised": {"k": 127732, "n": 1382522, "rate": 0.09239057316990254, "ci": [0.09190899837472788, 0.09287441319922615]}, "ppv_flag": {"k": 262834, "n": 265661, "rate": 0.9893586186907375, "ci": [0.9889612983345863, 0.989741786477371]}}, "dismissed_pathogenic": {"count": 20, "examples": [{"locus": "4:79984835 GC>G", "gene": "ANTXR2", "af": 0.5, "significance": "Pathogenic", "condition": "Hyaline fibromatosis syndrome"}, {"locus": "7:142750600 A>T", "gene": "PRSS1", "af": 0.47511, "significance": "Pathogenic", "condition": "PRSS1-related disorder"}, {"locus": "22:23960293 C>T", "gene": "GSTT2", "af": 0.06503, "significance": "Likely pathogenic", "condition": "Megalencephalic leukoencephalopathy with subcortical cysts 1"}, {"locus": "8:99832368 G>T", "gene": "VPS13B", "af": 0.04505, "significance": "Pathogenic", "condition": "VPS13B-related disorder"}, {"locus": "X:154536002 C>T", "gene": "G6PD", "af": 0.03762, "significance": "Pathogenic/Likely pathogenic", "condition": "G6PD-related disorders"}, {"locus": "2:71511923 T>G", "gene": "DYSF", "af": 0.03614, "significance": "Pathogenic", "condition": "Autosomal recessive limb-girdle muscular dystrophy"}, {"locus": "6:26092913 G>A", "gene": "HFE", "af": 0.03243, "significance": "Pathogenic/Pathogenic, low penetrance|risk factor", "condition": "Familial porphyria cutanea tarda"}, {"locus": "11:5227002 T>A", "gene": "HBB", "af": 0.02736, "significance": "Pathogenic", "condition": "Hereditary persistence of fetal hemoglobin"}, {"locus": "1:7984954 GGCC>G", "gene": "PARK7", "af": 0.02157, "significance": "Likely pathogenic", "condition": "not provided"}, {"locus": "1:145927447 C>T", "gene": "RBM8A", "af": 0.02122, "significance": "Pathogenic/Likely pathogenic/Pathogenic, low penetrance|other", "condition": "Fetal anomalies with a likely genetic cause"}, {"locus": "14:94380925 T>A", "gene": "SERPINA1", "af": 0.02007, "significance": "Pathogenic/Pathogenic, low penetrance|other", "condition": "SERPINA1-related disorder"}, {"locus": "2:181603835 A>C", "gene": "CERKL", "af": 0.0167, "significance": "Pathogenic/Likely pathogenic", "condition": "Cone dystrophy"}, {"locus": "7:142750561 C>T", "gene": "PRSS1", "af": 0.01604, "significance": "Pathogenic/Likely pathogenic", "condition": "PRSS1-related disorder"}, {"locus": "13:20189473 C>T", "gene": "GJB2", "af": 0.01538, "significance": "Pathogenic", "condition": "Monogenic hearing loss"}, {"locus": "17:31181787 T>G", "gene": "NF1", "af": 0.01445, "significance": "Pathogenic", "condition": "not specified"}]}, "notes": ["Blind mode: the ClinVar label is never given to the rules; it is only the answer key.", "Frequencies come from ClinVar's AF_EXAC / AF_TGP / AF_ESP fields (older, smaller cohorts than gnomAD). A variant missing from them is treated as not observed (rare).", "The 'high' tier needs a ClinVar assertion, so it cannot occur in blind mode.", "Rates are conditional on the true class, with 95% Wilson score intervals; positive predictive value depends on the pathogenic/benign mix (prevalence is reported).", "Labels are ClinVar's own and are not ground truth: they can be revised, and reflect which genes and variants get submitted."]}</script>
+
+<script>
+/* RULES:START  (port of src/varlens/rules.py; keep in sync, tests/test_landing_rules.py checks it) */
+var TH = { ba1: 0.05, bs1: 0.01, pm2: 0.0001 };
+function fmtG(x) { return x === 0 ? "0" : String(Number(x.toPrecision(6))); }
+function prioritise(a, th) {
+  th = th || TH;
+  var af = a.af, cv = a.clinvar, ev = [];
+  ev.push(af === null ? "Frequency: not found in population data" : "Frequency: " + fmtG(af));
+  var rare = af === null || af <= th.pm2;
+  var ba1 = af !== null && af >= th.ba1;
+  var bs1 = af !== null && af >= th.bs1;
+  var lof = !!a.lof;
+  if (cv) ev.push("ClinVar: " + cv.label + " (" + (cv.stars ? new Array(cv.stars + 1).join("\u2605") : "no stars") + ")");
+  if (lof) ev.push("Loss-of-function consequence (PVS1 candidate; check gene mechanism)");
+  if (rare) ev.push("PM2_supporting: absent or AF <= " + fmtG(th.pm2));
+  if (ba1) ev.push("BA1: AF >= " + fmtG(th.ba1) + " (stand-alone benign)");
+  else if (bs1) ev.push("BS1: AF >= " + fmtG(th.bs1) + " (too common for a rare disorder)");
+
+  if (ba1) return { tier: "low", evidence: ev };
+  if (cv) {
+    if (cv.category === "pathogenic") {
+      if (bs1) { ev.push("Conflict: ClinVar pathogenic but frequency is high; review"); return { tier: "review", evidence: ev }; }
+      return { tier: cv.stars >= 2 ? "high" : "review", evidence: ev };
+    }
+    if (cv.category === "conflicting") return { tier: "review", evidence: ev };
+    if (cv.category === "benign") return { tier: cv.stars >= 1 ? "low" : "vus", evidence: ev };
+  }
+  if (lof && rare) return { tier: "review", evidence: ev };
+  if (bs1) return { tier: "low", evidence: ev };
+  return { tier: "vus", evidence: ev };
+}
+/* RULES:END */
+
+(function () {
+  "use strict";
+  var TIERS = [
+    { id: "high", name: "High priority", tag: "ClinVar pathogenic, well reviewed" },
+    { id: "review", name: "Needs manual review", tag: "A person should look" },
+    { id: "vus", name: "Uncertain / unannotated", tag: "No decisive evidence" },
+    { id: "low", name: "Low priority", tag: "Common or reviewed benign" }
+  ];
+  var CV_LABEL = { pathogenic: "Pathogenic", benign: "Benign", vus: "Uncertain significance", conflicting: "Conflicting classifications" };
+  var LOF = { stop: true, frameshift: true, splice: true };
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, props, text) {
+    var n = document.createElement(tag);
+    if (props) for (var k in props) n.setAttribute(k, props[k]);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  /* ---------- triage widget ---------- */
+  var af = $("af"), afval = $("afval"), notobs = $("notobs"), cv = $("cv"), stars = $("stars"), csq = $("csq");
+  var lanes = $("lanes"), evidence = $("evidence");
+
+  function sliderToAf(v) { return Number(Math.pow(10, -6 + v / 100).toPrecision(2)); }
+  function afToSlider(x) { return Math.round((Math.log(x) / Math.LN10 + 6) * 100); }
+  function showAf(x) { return x < 0.001 ? x.toExponential(1).replace("e-", "e\u2212") : String(x); }
+
+  function render() {
+    var observed = !notobs.checked;
+    af.disabled = !observed;
+    var value = observed ? sliderToAf(Number(af.value)) : null;
+    afval.textContent = observed ? showAf(value) : "not observed";
+    var hasCv = cv.value !== "none";
+    stars.disabled = !hasCv;
+    var record = hasCv ? { category: cv.value, label: CV_LABEL[cv.value], stars: Number(stars.value) } : null;
+    var result = prioritise({ af: value, clinvar: record, lof: !!LOF[csq.value] });
+
+    lanes.textContent = "";
+    TIERS.forEach(function (t) {
+      var li = el("li", { "class": "lane" + (t.id === result.tier ? " active" : ""), "data-tier": t.id });
+      li.appendChild(el("span", null, t.name));
+      li.appendChild(el("span", { "class": "tag" }, t.tag));
+      if (t.id === result.tier) li.setAttribute("aria-current", "true");
+      lanes.appendChild(li);
+    });
+    evidence.textContent = "";
+    result.evidence.forEach(function (line) { evidence.appendChild(el("li", null, line)); });
+  }
+
+  var PRESETS = [
+    { name: "Common benign variant", af: 0.12, cv: "benign", stars: 2, csq: "synonymous" },
+    { name: "Rare frameshift, not in ClinVar", af: null, cv: "none", stars: 0, csq: "frameshift" },
+    { name: "Pathogenic and rare", af: 0.00001, cv: "pathogenic", stars: 2, csq: "missense" },
+    { name: "Pathogenic but common", af: 0.03, cv: "pathogenic", stars: 2, csq: "missense" }
+  ];
+  var presetBox = $("presets"), presetButtons = [];
+  function applyPreset(p, button) {
+    notobs.checked = p.af === null;
+    if (p.af !== null) af.value = afToSlider(p.af);
+    cv.value = p.cv; stars.value = String(p.stars); csq.value = p.csq;
+    presetButtons.forEach(function (b) { b.setAttribute("aria-pressed", b === button ? "true" : "false"); });
+    render();
+  }
+  PRESETS.forEach(function (p) {
+    var b = el("button", { type: "button", "aria-pressed": "false" }, p.name);
+    b.addEventListener("click", function () { applyPreset(p, b); });
+    presetBox.appendChild(b); presetButtons.push(b);
+  });
+  [af, notobs, cv, stars, csq].forEach(function (c) {
+    c.addEventListener("input", function () { presetButtons.forEach(function (b) { b.setAttribute("aria-pressed", "false"); }); render(); });
+  });
+  applyPreset(PRESETS[2], presetButtons[2]);
+
+  /* ---------- copy buttons ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.parentNode.querySelector("pre").textContent;
+      var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () {});
+      else done();
+    });
+  });
+
+  /* ---------- benchmark results ---------- */
+  function pct(x) { return x === null || x === undefined ? "n/a" : (100 * x).toFixed(x > 0 && x < 0.001 ? 3 : 1) + "%"; }
+  function ciText(m) { return "95% CI " + pct(m.ci[0]) + " to " + pct(m.ci[1]); }
+
+  function metric(title, hint, m) {
+    var box = el("div", { "class": "metric" });
+    box.appendChild(el("h3", null, title));
+    box.appendChild(el("div", { "class": "num" }, pct(m.rate)));
+    var track = el("div", { "class": "ci", role: "img", "aria-label": ciText(m) });
+    var range = el("div", { "class": "range" });
+    range.style.left = (100 * m.ci[0]) + "%";
+    range.style.width = (100 * (m.ci[1] - m.ci[0])) + "%";
+    track.appendChild(range);
+    if (m.rate !== null) { var dot = el("div", { "class": "dot" }); dot.style.left = (100 * m.rate) + "%"; track.appendChild(dot); }
+    box.appendChild(track);
+    box.appendChild(el("div", { "class": "sub" }, m.k + " of " + m.n + ". " + ciText(m) + ". " + hint));
+    return box;
+  }
+
+  function renderBenchmark(d) {
+    var out = $("bench-results");
+    out.hidden = false;
+    $("bench-pending").hidden = true;
+    out.appendChild(el("p", { style: "margin-top:1.6rem" },
+      "Scored on " + d.n.pathogenic.toLocaleString("en") + " pathogenic and " + d.n.benign.toLocaleString("en") +
+      " benign ClinVar variants with at least " + d.min_stars + " review star" + (d.min_stars === 1 ? "" : "s") +
+      (d.region ? " in region " + d.region : "") + ". Run on " + d.date + " with varlens " + d.varlens_version + " against " + d.clinvar_file + "."));
+
+    var bars = el("div", { "class": "bars" });
+    ["pathogenic", "benign"].forEach(function (label) {
+      var counts = d.tiers[label], total = d.n[label];
+      var row = el("div", { "class": "barrow" });
+      var head = el("div", { "class": "lab" });
+      head.appendChild(el("span", null, "ClinVar " + label));
+      head.appendChild(el("span", null, "n = " + total.toLocaleString("en")));
+      row.appendChild(head);
+      var stack = el("div", { "class": "stack", role: "img", "aria-label": TIERS.map(function (t) { return t.name + " " + counts[t.id]; }).join(", ") });
+      TIERS.forEach(function (t) {
+        if (!counts[t.id]) return;
+        var seg = el("span", { "class": t.id, title: t.name + ": " + counts[t.id] });
+        seg.style.width = (100 * counts[t.id] / total) + "%";
+        stack.appendChild(seg);
+      });
+      row.appendChild(stack);
+      bars.appendChild(row);
+    });
+    out.appendChild(bars);
+    var legend = el("div", { "class": "legend" });
+    TIERS.forEach(function (t) {
+      var item = el("span");
+      var sw = el("i"); sw.style.background = "var(--" + t.id + "-fg)";
+      item.appendChild(sw); item.appendChild(document.createTextNode(t.name));
+      legend.appendChild(item);
+    });
+    out.appendChild(legend);
+
+    var m = d.metrics, grid = el("div", { "class": "metrics" });
+    grid.appendChild(metric("Pathogenic variants flagged for review", "Higher is better.", m.sensitivity_flag));
+    grid.appendChild(metric("Benign variants flagged for review", "Lower is better.", m.false_alarm_rate));
+    grid.appendChild(metric("Pathogenic variants dismissed as low priority", "Lower is better. These are false reassurances.", m.pathogenic_dismissed));
+    grid.appendChild(metric("Benign variants recognised as low priority", "Higher is better.", m.benign_recognised));
+    out.appendChild(grid);
+
+    out.appendChild(el("p", null,
+      "When the rules flag a variant for review, " + pct(m.ppv_flag.rate) + " of the flagged variants are pathogenic (" + ciText(m.ppv_flag) +
+      "). That figure is specific to this answer key, where " + pct(d.prevalence_pathogenic) + " of the labelled variants are pathogenic."));
+    out.appendChild(el("p", null,
+      "Frequency data exists for " + pct(d.af_coverage.pathogenic.rate) + " of the pathogenic and " + pct(d.af_coverage.benign.rate) +
+      " of the benign variants. " + pct(d.lof_fraction.pathogenic.rate) + " of the pathogenic variants have a loss-of-function consequence, " +
+      "which is the ceiling for how many the review flag can reach without ClinVar's verdict."));
+
+    var tp = d.tiers.pathogenic, lofP = d.lof_fraction.pathogenic, lofB = d.lof_fraction.benign;
+    var sens = m.sensitivity_flag.rate, fa = m.false_alarm_rate.rate, pv = 0.001;
+    var ppvLow = sens * pv / (sens * pv + fa * (1 - pv));
+    out.appendChild(el("h3", { style: "margin-top:1.6rem" }, "How to read these numbers"));
+    var reading = el("ul", { "class": "plain" });
+    [
+      "The review flag mostly tracks loss of function: " + pct(lofP.rate) + " of pathogenic variants have a loss-of-function consequence, against " + pct(lofB.rate) +
+        " of benign ones. ClinVar curators also use consequence as evidence, so part of this agreement is by construction.",
+      tp.vus.toLocaleString("en") + " pathogenic variants (" + pct(tp.vus / d.n.pathogenic) + ") stay in the uncertain tier, and " +
+        (d.n.pathogenic - lofP.k).toLocaleString("en") + " pathogenic variants have no loss-of-function consequence. Frequency and consequence alone cannot separate these from benign variants; " +
+        "this is where missense-aware evidence (predictors, a trained model) would have to add value.",
+      "Positive predictive value depends on prevalence. Among the rare variants in a real sample, pathogenic ones are far scarcer than in ClinVar. " +
+        "With the same sensitivity and false-alarm rate, a prevalence of 0.1% would give a PPV of about " + pct(ppvLow) + ".",
+      "Frequency data exists for few pathogenic variants, so the frequency rules rarely get to act on them, and a missing frequency is treated as rare."
+    ].forEach(function (t) { reading.appendChild(el("li", null, t)); });
+    out.appendChild(reading);
+
+    var ex = d.dismissed_pathogenic;
+    if (ex && ex.examples.length) {
+      out.appendChild(el("h3", { style: "margin-top:1.6rem" }, "Pathogenic variants the rules would dismiss"));
+      out.appendChild(el("p", null, ex.count.toLocaleString("en") + " in total. The most common are below. ACMG/AMP guidance allows exceptions to the BA1 cut-off for known common pathogenic variants, and several of these entries are labelled low penetrance or risk factor in ClinVar itself. varlens has no exception list yet."));
+      var wrap = el("div", { "class": "scroll" }), tbl = el("table"), thead = el("thead"), hr = el("tr");
+      ["Gene", "Variant", "Frequency", "Condition"].forEach(function (h) { hr.appendChild(el("th", null, h)); });
+      thead.appendChild(hr); tbl.appendChild(thead);
+      var tb = el("tbody");
+      ex.examples.slice(0, 8).forEach(function (e) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, e.gene));
+        tr.appendChild(el("td", { "class": "mono", style: "font-family:var(--mono);font-size:0.88rem" }, e.locus));
+        tr.appendChild(el("td", null, e.af === null ? "n/a" : String(Number(e.af.toPrecision(3)))));
+        tr.appendChild(el("td", null, e.condition || "not specified"));
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb); wrap.appendChild(tbl); out.appendChild(wrap);
+    }
+
+    if (d.notes && d.notes.length) {
+      out.appendChild(el("h3", { style: "margin-top:1.6rem" }, "Method and caveats"));
+      var ul = el("ul", { "class": "plain" });
+      d.notes.forEach(function (n) { ul.appendChild(el("li", null, n)); });
+      out.appendChild(ul);
+    }
+  }
+
+  try {
+    var data = JSON.parse($("benchmark-data").textContent);
+    if (data) renderBenchmark(data);
+  } catch (err) { /* keep the pending message */ }
+})();
+</script>
+</body>
+</html>

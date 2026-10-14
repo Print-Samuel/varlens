@@ -8,3 +8,7 @@ dist/
 # never commit real patient data or full ClinVar/gnomAD dumps
 *.vcf.gz
 !data/*.vcf.gz
+
+# virtual environments
+.venv/
+venv/

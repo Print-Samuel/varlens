@@ -102,6 +102,63 @@ python scripts/make_positive_control.py --clinvar clinvar.vcf.gz --chrom 21 \
 
 Never commit real patient data. `.gitignore` excludes `*.vcf.gz` by default.
 
+## Benchmark: does the ranking agree with ClinVar?
+
+`varlens-benchmark` scores the rules against ClinVar-labelled variants. It is **blind**: using ClinVar's
+own verdict to rank ClinVar variants would be circular (the answer key would also be an input), so each
+variant goes through the rules with no ClinVar record, using only the population frequency
+(ClinVar's `AF_EXAC`, `AF_TGP` and `AF_ESP` fields) and the molecular consequence (`MC`) stored in
+the same VCF. The pathogenic or benign label is used afterwards, only as the answer key.
+
+```bash
+varlens-benchmark clinvar.vcf.gz --markdown BENCHMARK.md --embed docs/index.html
+varlens-benchmark clinvar.vcf.gz --min-stars 2          # stricter answer key
+varlens-benchmark clinvar.vcf.gz --region 21            # one chromosome, much faster
+```
+
+It reads the whole ClinVar file once, prints a summary, writes `benchmark_results.json`, and
+(optionally) a Markdown summary and the numbers for the landing page. Reported, each with a 95% Wilson
+score interval: the share of pathogenic variants flagged for review, the share of benign variants
+flagged, the share of pathogenic variants *dismissed as low priority* (false reassurance), the share of
+benign variants recognised as low priority, and the positive predictive value together with the
+prevalence it depends on. It also lists the most common pathogenic variants the rules would dismiss,
+which tend to be known common pathogenic variants that ACMG/AMP guidance treats as exceptions to BA1.
+
+Results on ClinVar (2026-10-14, varlens 0.1.0, 335,306 pathogenic and 1,382,522 benign variants with at least one review star; full table in [BENCHMARK.md](BENCHMARK.md)):
+
+| Question | Result |
+|---|---|
+| Pathogenic variants flagged for review | 78.4% (95% CI 78.2% to 78.5%) |
+| Benign variants flagged for review | 0.2% |
+| Pathogenic variants dismissed as low priority | 0.006% (20 of 335,306) |
+| Benign variants recognised as low priority | 9.2% |
+| Positive predictive value of the review flag | 98.9%, with 19.5% of the answer key pathogenic |
+
+How to read it: the rules almost never dismiss a pathogenic variant, and they flag the loss-of-function
+ones well, but they cannot tell the other 21.6% of pathogenic variants from benign ones (mostly variants
+without a loss-of-function consequence). The 98.9% positive predictive value is specific to ClinVar's mix;
+at a prevalence of 0.1% the same rates would give about 28%. The next step is to measure missense variants
+separately and compare these rules with a trained model.
+
+What it can and cannot tell you:
+- The `high` tier needs a ClinVar assertion, so it cannot occur in blind mode. The benchmark measures
+  how much signal the frequency and consequence rules recover on their own.
+- ClinVar's AF fields come from older, smaller cohorts than gnomAD, and a variant missing from them is
+  treated as not observed. Frequency coverage is reported per class so you can see how much that matters.
+- ClinVar labels are not ground truth, and they reflect which genes and variants get submitted.
+
+## Landing page
+
+`docs/index.html` is a single self-contained page (HTML, CSS and JavaScript, no external requests) with
+a live demo of the rules, the pipeline, the rules table, the benchmark and the install commands. The demo
+re-implements `rules.prioritise` in JavaScript, and `tests/test_landing_rules.py` runs both over 520
+input combinations (when Node is installed) so they cannot drift apart.
+
+To publish it with GitHub Pages: repository **Settings > Pages > Deploy from a branch**, branch `main`,
+folder `/docs`. The page then lives at `https://Print-Samuel.github.io/varlens/`. Running
+`varlens-benchmark ... --embed docs/index.html` writes the benchmark numbers into the page; until you do,
+it shows a "results have not been generated yet" notice instead of any numbers.
+
 ## How prioritisation works
 
 | Evidence | Rule (defaults, configurable) | Effect |
@@ -134,7 +191,7 @@ Tiers: **High priority**, **Needs manual review**, **Uncertain / unannotated**, 
 - `--region` only accepts a chromosome or a numeric coordinate window, not a gene symbol yet --
   you need the gene's coordinates from somewhere else (e.g. Ensembl) until gene-symbol lookup
   lands (see Roadmap).
-- Not validated against a truth set. A benchmark against ClinVar-labelled variants is planned.
+- Only partly validated: `varlens-benchmark` tests the frequency and consequence rules blind against ClinVar labels, but not against an independent truth set, and not the `high` tier.
 
 ## Development
 
@@ -149,7 +206,9 @@ CI runs the test suite on Python 3.9, 3.11 and 3.12.
 
 - [ ] Tabix-indexed ClinVar/gnomAD lookup
 - [ ] `bcftools norm` integration / built-in left-alignment
-- [ ] Benchmark of the rules on ClinVar-labelled variants (precision/recall per tier)
+- [x] Blind benchmark of the rules on ClinVar-labelled variants (`varlens-benchmark`)
+- [ ] Compare the rules with a trained model on the same answer key
+- [ ] Exception list for known common pathogenic variants (BA1 exceptions)
 - [ ] Gene-level LoF-intolerance data (e.g. pLI/LOEUF) to refine the LoF flag
 - [ ] Trio mode (de novo / compound heterozygous)
 - [ ] `--gene SYMBOL` as a shortcut for `--region`, resolved via a bundled or fetched coordinate table
